@@ -1,0 +1,58 @@
+---
+- name: Setup Java, Git, Maven, Clone and Build Spring Project
+  hosts: dev
+  user: ansible
+  become: yes
+  connection: ssh
+  gather_facts: no
+
+  vars:
+    maven_version: "3.9.10"
+    maven_dir: "apache-maven-3.9.10"
+    maven_url: "https://downloads.apache.org/maven/maven-3/3.9.10/binaries/apache-maven-3.9.10-bin.tar.gz"
+    maven_path: "/root/maven"
+    repo_url: "https://github.com/ManojVattikuti982/sak_group_spring_app.git"
+    project_name: "sak_group_spring_app"
+    project_path: "/root/sak_group_spring_app"
+
+  tasks:
+
+    - name: Install Git and Java 17
+      shell: yum install java-17* git -y
+
+    - name: Fetch Maven binary from Apache site
+      command: wget "{{ maven_url }}" -O /tmp/apache-maven.tar.gz
+
+    - name: Unpack Maven archive into /root
+      command: tar -zxvf /tmp/apache-maven.tar.gz -C /root
+
+    - name: Move Maven to standard directory
+      command: mv /root/{{ maven_dir }} {{ maven_path }}
+
+    - name: Add Maven bin to PATH in root .bashrc
+      lineinfile:
+        path: /root/.bashrc
+        line: 'export PATH={{ maven_path }}/bin:$PATH'
+        state: present
+
+    - name: Clone Spring Boot project from GitHub
+      git:
+        repo: "{{ repo_url }}"
+        dest: "{{ project_path }}"
+        version: HEAD
+
+    - name: Write Maven build script with skip tests flag
+      copy:
+        dest: "{{ project_path }}/build.sh"
+        mode: '0755'
+        content: |
+          #!/bin/bash
+          echo "=== Running Maven Build ==="
+          export PATH={{ maven_path }}/bin:$PATH
+          cd {{ project_path }}
+          mvn clean install -DskipTests
+
+    - name: Execute the Maven build script
+      shell: ./build.sh
+      args:
+        chdir: "{{ project_path }}"
